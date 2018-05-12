@@ -32,10 +32,10 @@ MESSAGE_TYPE_ERROR = 'error'
 
 def writeTweets(wsHandler, language, keyword):
     auth = OAuth(
-        consumer_key='xGXeoEyZFRbPcSRQQLoooNhMM',
-        consumer_secret='kIiZCh8lIWLjP4PpyY0o1H79WyW1CAXtAcmBcqxYld6WxLYXbz',
-        token='1949527872-JQmEZOPqPcyFPnNPQYcBqxQav6x0TqPHtSdI4IN',
-        token_secret='SDZBATV34i8gBFlFApU77ZV1K0b2j896uE7xT9Q814ZYK'
+        consumer_key='xxx',
+        consumer_secret='xxx',
+        token='xxxx',
+        token_secret='xxxxx'
     )
 
     number_of_tweets_received = 0
