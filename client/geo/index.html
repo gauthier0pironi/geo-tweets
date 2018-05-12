@@ -1,0 +1,212 @@
+<em><!DOCTYPE html>
+	<html xmlns="http://www.w3.org/1999/xhtml">
+	<head>
+		<script type="text/javascript" src="js/jquery-2.1.1.min.js"></script>
+		<script type="text/javascript" src="js/ol.js"></script>
+		<script type="text/javascript" src="js/jquery.sumoselect.min.js"></script>
+		<link rel='stylesheet' href='css/GeoTweets.css'>
+		<link rel='stylesheet' href='css/sumoselect.css'>
+
+		<title>GeoTweets</title>
+		<script>
+		///////VARIABLE GLOBALES TWEETS.JS////////
+		//var adresse ="ws://pironiga.no-ip.org:8888/wsGeoTweets";
+		var adresse = "ws://localhost:8888/wsGeoTweets"
+		var duration_before_color_change= 1;
+		var duration_before_fadeout = 30;
+		var texteGrosButton = 'GO!!!'
+		var center_x = 0;
+		var center_y = 30;
+		/////////////////////////////////////////
+		var multiSelectLanguage 
+		var s;
+		var firstTime = true;
+		var tweetRecus = 0;
+		var map;
+		var pos = ol.proj.transform([center_x, center_y], 'EPSG:4326', 'EPSG:3857');
+		var view =  new ol.View({
+			projection: 'EPSG:900913',
+			center:pos,
+			zoom:2
+		});
+		/////////////////////////////////////////
+		function init(){
+			//multiselect
+			multiSelectLanguage	= $('#language').SumoSelect();
+			map = new ol.Map({
+				interactions: ol.interaction.defaults().extend([
+					new ol.interaction.DragRotateAndZoom()
+					]),
+					target:'map',
+					renderer:'canvas',
+					view: view
+				});
+
+				var baseLayer = new ol.layer.Tile({
+					source: new ol.source.OSM()
+				});
+				view.on('change:resolution', function(event) {
+					//changer la taille des images:
+					//le zoom va de 0 a 28
+					$(".tweet_label").width(view.getZoom()*2+1) ;
+					$(".tweet_label").height(view.getZoom()*2+1) ;
+				});
+				map.addLayer(baseLayer);
+				initSocket();
+			}
+			/////////////////////////////////////////
+			function sendServer(){
+				if (s.readyState == s.CLOSED){
+					$("#status").html("En cours de connection..." );
+					initSocket()
+				}
+				if (s.readyState == s.CONNECTING){
+					$("#status").html("En cours de connection..." );
+				}
+				if (s.readyState == s.OPEN){
+					//change this to get the value??? TODO
+					$("#status").html("Communication avec le serveur." );
+					var max = multiSelectLanguage.selectedOptions.length 
+					var language= [];
+					for (var i = 0 ;i<max;i ++)
+					{
+						console.log(multiSelectLanguage.selectedOptions[i].value);
+						language.push(multiSelectLanguage.selectedOptions[i].value);
+					}
+
+					var keyword = $("#keyword").val();
+
+					var msg = {
+						language: language.join(','),
+						keyword:   keyword
+					};
+
+					s.send(JSON.stringify(msg));
+				}
+			}
+			/////////////////////////////////////////
+			function initSocket(){
+				s = new WebSocket(adresse);
+				s.onopen = function(e) { 
+					$("#status").html("Connect&eacute; au serveur.");  
+					$("#bigButtonText").html(texteGrosButton);  
+				}
+
+				s.onclose = function(e) { 
+					$("#status").html("Deconnect&eacute; du serveur (" + e.code + ':' + e.reason + ').' );
+					$("#bigButtonText").html("Se connecter!!!");  
+				}
+
+				s.onmessage = function(e) { 
+					var message = JSON.parse(e.data);
+					var type = message['type'];
+					if (type == "tweet"){
+						tweetRecus++;
+						var id = message['id'];
+						var time = message['time'];
+						//swap xy because twitter sends it like that
+						var x = message['y'];
+						var y = message['x'];
+						var text = message['text']
+
+						if (tweetRecus % 20 == 0){
+							$("#loader").html('');
+						}
+
+						$("#loader").append('.');
+
+						//$("#overlayContainer").append('<img title="'+ text+'" class = "tweet_label" id=' + id+ ' width="'+(view.getZoom()*2+1)+'px" height="'+(view.getZoom()*2+1)+'px" src="img/redBall30.png">');
+						
+						
+						
+						$("#overlayContainer").append('<div style=height:' + (view.getZoom()*2+1)+'px;width:'+(view.getZoom()*2+1)+'px; title="'+ text+'" class = "tweet_label" id=' + id+ ' width="'+(view.getZoom()*2+1)+'px" height="'+(view.getZoom()*2+1)+'px"></div>');
+						
+									
+						setTimeout(function(){ $('#'+id).css('background',"blue");}, duration_before_color_change * 1000);
+						setTimeout(function(){ $('#'+id).fadeOut();	$('#'+id).remove();	$('[name="'+id+'"]').remove()}, duration_before_fadeout * 1000);
+						$("#numberTweets").html(tweetRecus);
+
+
+
+						$("#message").append('<span class="tweetTextLabel" name="'+ id+'">'+text+'</span><br>'); 
+						// scroll show the bottom of the text
+						$("#message").scrollTop($("#message")[0].scrollHeight);
+
+
+						//TODO : repositionner les boules de couleurs. de -15 -15 probablement ca devrait marcher...
+						$( ".tweetTextLabel" ).mouseover(function() {
+							$('#' + this.getAttribute('name')).width(30) ;
+							$('#' + this.getAttribute('name')).height(30) ;
+						});
+							
+
+						$( ".tweetTextLabel" ).mouseout(function() {
+							$('#' + this.getAttribute('name')).width(view.getZoom()*2+1) ;
+							$('#' + this.getAttribute('name')).height(view.getZoom()*2+1) ;
+						});
+
+						//transform from lat,lont to something the map seems to like
+						var pos = ol.proj.transform([x, y], 'EPSG:4326', 'EPSG:3857');
+
+						var newOverlay = new ol.Overlay({
+							position: pos,
+							element: $("#" + id)
+						});
+						map.addOverlay(newOverlay);
+					}
+
+					else if (type == "error")
+					{
+						var code = message['code'];
+						var reason = message['reason'];
+
+						$("#status").html(code + ':' + reason );
+					}
+				}
+			}
+			/////////////////////////////////////////
+			</script>
+		</head>
+
+
+		<body onload="init()">
+
+
+			<div id="main" class='box'>
+				<span id="title">GeoTweets 0.2</span><br/>
+				Statut : <div style="display:inline;"  id= 'status'>Pas connect&eacute;</div> <br/>
+				Nombre de tweets re&ccedil;us: <div style="display:inline;"  id= 'numberTweets'>0</div> <div style="display:inline;"  id= 'loader'></div>
+			</div>
+
+			<div id = "bigButton" class='box'>
+				<button  onclick = "sendServer()" id = "submit"> <span id='bigButtonText'>SE CONNECTER!!!</span></button>
+			</div>
+
+			<div id = "filtering" class='box'>
+				<span id="title">Filtres</span><br>
+				<select multiple="multiple" id="language" placeholder="Choisir une langue...">
+					<option name = "language" value="fr">Fran&ccedil;ais</option>
+					<option name = "language" value="en">Anglais</option>
+					<option name = "language" value="en-gb">Anglais Grande-Bretagne</option>
+					<option name = "language" value="ja">Japonais</option>
+					<option name = "language" value="ar">Arabe</option>
+					<option name = "language" value="es">Espagnol</option>
+					<option name = "language" value="de">Allemand</option>
+					<option name = "language" value="it">Italien</option>
+					<option name = "language" value="ru">Russe</option>
+					<option name = "language" value="zh-tw">Chinois traditionnel</option>
+					<option name = "language" value="zh-cn">Chinois simplifi&eacute;</option>
+				</select>
+
+				<input type="text" id="keyword" placeholder='Entrer un mot cl&eacute;...'>
+			</div>
+
+			<div id="map" ></div>
+
+			<div id='overlayContainer'style="display: none;"></div>
+
+			<div id="message" class='box'></div>    
+
+		</body>
+		</html>
+	</em>
